@@ -7,7 +7,7 @@ var reverseString = server.reverseString;
 var bodyParser = require('body-parser');
 
 // Defines what happens when it receives the `GET /` request
-app.get('/', function (req, res) {
+app.get(function (req, res) {
   res.send('Hello World!');
 });
 
@@ -18,8 +18,11 @@ app.listen(3000, function () {
 
 app.use(bodyParser.text());
 
+app.use(express.static('../client/build'));
+
+
 // Handle POST /reverse [data]
-app.post('/reverse', function (req, res) {
+app.post(function (req, res) {
   // How do we get the input text?
   // How do we send the output text?
   if (typeof(req.body) === 'string') {

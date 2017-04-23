@@ -7,6 +7,8 @@ var reverseString = server.reverseString;
 var bodyParser = require('body-parser');
 var database = require('./database.js');
 var readDocument = database.readDocument;
+var CommentSchema = require('./schemas/comment.json');
+
 
 // Defines what happens when it receives the `GET /` request
 app.get(function (req, res) {
@@ -316,6 +318,80 @@ app.post('/feeditem',
     res.status(401).end();
   }
 });
+
+function postComment(feedItemId, author, contents) {
+    var feedItem = readDocument('feedItems', feedItemId);
+   feedItem.comments.push({
+     "author": author,
+     "contents": contents,
+     "postDate": new Date().getTime(),
+     "likeCounter": []
+   });
+   writeDocument('feedItems', feedItem);
+   return getFeedItemSync(feedItemId);
+   }
+
+     app.post('/comment',
+          validate({body:CommentSchema}), function(req,res) {
+           var body= req.body;
+           var fromUser = getUserIdFromToken(req.get('Authorization'));
+
+           if(fromUser === body.userId) {
+             var newUpdateComment = postComment(body.feedId, body.userId,
+                                             body.contents);
+
+
+             res.status(201);
+             res.set('Location', '/feeditem/' + newUpdateComment._id);
+             res.send(newUpdateComment)
+           }
+           else {
+               res.status(401).end();
+           }
+         });
+
+         app.put('/feeditem/:feeditemid/comment/:commentIdx/likelist/:userid', function(req,res) {
+            var fromUser = getUserIdFromToken(req.get('Authorization'));
+           var feedItemId = parseInt(req.params.feeditemid, 10);
+          var commentIndex = parseInt(req.params.commentIdx,10);
+           var userId = parseInt(req.params.userid, 10);
+           if (fromUser === userId) {
+             var feedItem = readDocument('feedItems', feedItemId);
+             var comment = feedItem.comments[commentIndex]
+             if (comment.likeCounter.indexOf(userId) === -1) {
+               comment.likeCounter.push(userId);
+               writeDocument('feedItems', feedItem);
+             }
+           comment.author = readDocument('users', comment.author);
+             res.send(comment)
+           }
+           else {
+             res.status(401).end();
+           }
+         });
+
+     app.delete('/feeditem/:feeditemid/comment/:commentIdx/likelist/:userid', function(req,res) {
+             var fromUser = getUserIdFromToken(req.get('Authorization'));
+             var feedItemId = parseInt(req.params.feeditemid, 10);
+             var commentIndex = parseInt(req.params.commentIdx,10);
+             var userId = parseInt(req.params.userid, 10);
+             if (fromUser === userId) {
+               var feedItem = readDocument('feedItems', feedItemId);
+               var comment = feedItem.comments[commentIndex]
+               var userIndex = comment.likeCounter.indexOf(userId)
+
+               if (userIndex !== -1) {
+                 comment.likeCounter.splice(userIndex, 1);
+                 writeDocument('feedItems', feedItem);
+               }
+               comment.author = readDocument('users', comment.author);
+               res.send(comment)
+             }
+             else {
+               // 401: Unauthorized.
+               res.status(401).end();
+             }
+           });
 
 /**
  * Translate JSON Schema Validation failures into error 400s.
